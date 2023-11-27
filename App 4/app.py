@@ -3,6 +3,7 @@ import plotly.express as px
 import pandas as pd
 import numpy as np
 import dash_bootstrap_components as dbc
+import json
 #import scanpy as sc
 
 df = pd.read_csv('https://raw.githubusercontent.com/plotly/datasets/master/gapminder_unfiltered.csv')
@@ -51,9 +52,19 @@ app.layout = dbc.Container([
     
     dbc.Row([
         dbc.Col([
-            dcc.Graph(id='graph-content-all',  hoverData={'points': [{'customdata': ['Japan']}]})
-        ], width=6),
-
+            dbc.Row([
+                dcc.Graph(id='graph-content-all',  hoverData={'points': [{'customdata': ['Japan']}]}), 
+                # dcc.Store stores the intermediate value
+                dcc.Store(id='intermediate-value')
+            ]),
+            dbc.Row([
+                dcc.Dropdown(['country','continent'], 'country', id='dropdown')
+            ]),
+            dbc.Row([
+                dcc.Graph(id='graph-mean-histogram')
+            ])
+        ]),
+    
         dbc.Col([
             dbc.Row([
                 dcc.Graph(id='graph-content-country')
@@ -100,6 +111,35 @@ def get_figure(df, selectedData, col_chosen_1, col_chosen_2):
 
     return fig
 
+# Plot of selected countries with averages across years
+# using saved data on dcc.Store
+
+#### Save elaborated data - This is calculated only once and passed into 
+# a json object.
+@callback(Output('intermediate-value', 'data'), Input('dropdown', 'value'))
+def clean_data(value):
+    # cleaned_df = slow_processing_step(value)
+
+    # a few filter steps that compute the data
+    # as it's needed in the future callbacks
+
+    df_1 = df[ ['continent', 'lifeExp'] ]
+    df_1 = df_1.groupby('continent').mean()
+
+    df_2 = df[ ['country', 'lifeExp'] ]
+    df_2 = df_2.groupby('country').mean()
+     
+
+    datasets = {
+        'continent': df_1.to_json(orient='split', date_format='iso'),
+        'country': df_2.to_json(orient='split', date_format='iso'),
+    }
+
+    print(datasets['continent'])
+    print(datasets['country'])
+
+    return json.dumps(datasets)
+
 
 
 ##### Callback of main graph with all countries
@@ -132,11 +172,24 @@ def update_graph_1(col_chosen_1, col_chosen_2, year):
 #here, we subset with the country chosen by hovering on the scatter plot
 def update_graph_2(hover_all, col_chosen_1, col_chosen_2):
     country=hover_all['points'][0]['customdata'][0]
-    print(country)
     dff = df[df.country==country]
     fig =  px.scatter(dff, x=col_chosen_1, y=col_chosen_2, title=f'{country}', hover_data='year')
     fig.update_layout(transition_duration=500)
     return fig
+
+
+# printing a graph from json'ed data
+@callback(
+    Output('graph-mean-histogram', 'figure'),
+    Input('intermediate-value', 'data'),
+    Input('dropdown', 'value'),
+    )
+def update_graph_4(jsonified_cleaned_data, selectedData, value):
+    datasets = json.loads(jsonified_cleaned_data)
+    dff = pd.read_json(datasets[value], orient='split')
+    figure = px.histogram(dff, x='lifeExp', title=f'{value} life expectancy')
+    return figure
+
 
 ##### Callback creating histogram from data subset
 @callback(
@@ -146,7 +199,7 @@ def update_graph_2(hover_all, col_chosen_1, col_chosen_2):
     Input('controls-and-radio-item-2', 'value'),
     Input('year-slider', 'value') #just using this to redo the same histogram when changing year in the main plot, otherwise gives error!
 )
-#here, we subset with the country chosen by selecting on the scatter plot
+#here, we subset with the country chosen by selection on the scatter plot
 def update_graph_3(selection_all, col_chosen_1, col_chosen_2, year):
     
     print("hello")
