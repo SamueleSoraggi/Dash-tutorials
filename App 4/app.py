@@ -29,14 +29,10 @@ app.layout = dbc.Container([
         ], width=4),
         dbc.Col([
             dbc.RadioItems(options=[{"label": x, "value": x} for x in ['pop', 'lifeExp', 'gdpPercap']],
-                       value='lifeExp',
+                       value='pop',
                        inline=True,
                        id='controls-and-radio-item-2')
-        ], width=4)
-        #dbc.Col([
-        #    dcc.Dropdown(['country','continent',None], None, id='dropdown-selection')
-        #], width=4)
-        
+        ], width=4)  
     ]),
     
     dbc.Row([
@@ -51,30 +47,27 @@ app.layout = dbc.Container([
     ]),
     
     dbc.Row([
-        dbc.Col([
-            dbc.Row([
-                dcc.Graph(id='graph-content-all',  hoverData={'points': [{'customdata': ['Japan']}]}), 
-                # dcc.Store stores the intermediate value
-                dcc.Store(id='intermediate-value')
-            ]),
-            dbc.Row([
-                dcc.Dropdown(['country','continent'], 'country', id='dropdown')
-            ]),
-            dbc.Row([
-                dcc.Graph(id='graph-mean-histogram')
-            ])
-        ]),
+        dbc.Col(          
+            dcc.Graph(id='graph-content-all', hoverData={'points': [{'customdata': ['Japan']}]}),     
+        style={'height': '800px'}),
     
         dbc.Col([
-            dbc.Row([
+            dbc.Row(
                 dcc.Graph(id='graph-content-country')
-            ]),
-            dbc.Row([
+            , align='center'),
+            dbc.Row(
                 dcc.Graph(id='graph-hist-selection')
-            ]),
-        ]),
-    ])
-    
+            , align='center'),
+        ],style={'height': '800px'}),
+    ]),
+ 
+    dbc.Row([
+        dcc.Dropdown(['country','continent'], 'country', id='dropdown'),
+        dcc.Graph(id='graph-mean-histogram'),
+        # dcc.Store stores the intermediate value
+        dcc.Store(id='intermediate-value')
+    ]),
+
 ], fluid=True)
 
 
@@ -107,7 +100,7 @@ def get_figure(df, selectedData, col_chosen_1, col_chosen_2):
     dff = df.query(f'{col_chosen_1}>{selection_bounds["x0"]} & {col_chosen_1}<{selection_bounds["x1"]}')
     dff = dff.query(f'{col_chosen_2}>{selection_bounds["y0"]} & {col_chosen_2}<{selection_bounds["y1"]}')
     
-    fig = px.histogram(dff, x=col_chosen_1, title=f'{col_chosen_1} of selected countries across years')
+    fig = px.histogram(dff, x=col_chosen_1, title=f'{col_chosen_1} of selected countries across years', height=400)
 
     return fig
 
@@ -141,7 +134,6 @@ def clean_data(value):
     return json.dumps(datasets)
 
 
-
 ##### Callback of main graph with all countries
 @callback(
     Output('graph-content-all', 'figure'),
@@ -155,7 +147,9 @@ def clean_data(value):
 def update_graph_1(col_chosen_1, col_chosen_2, year):
     dff = df[df.year==year]
     #return px.line(dff, x='year', y=col_chosen[1], color=value)
-    fig =  px.scatter(dff, x=col_chosen_1, y=col_chosen_2, hover_data='country')
+    fig =  px.scatter(dff, x=col_chosen_1, y=col_chosen_2, 
+                      hover_data='country', height=800,
+                      title=f'{col_chosen_1} vs {col_chosen_2} across countries')
     fig.update_layout(transition_duration=500)
     
     fig.update_layout(clickmode='event+select')
@@ -173,7 +167,7 @@ def update_graph_1(col_chosen_1, col_chosen_2, year):
 def update_graph_2(hover_all, col_chosen_1, col_chosen_2):
     country=hover_all['points'][0]['customdata'][0]
     dff = df[df.country==country]
-    fig =  px.scatter(dff, x=col_chosen_1, y=col_chosen_2, title=f'{country}', hover_data='year')
+    fig =  px.scatter(dff, x=col_chosen_1, y=col_chosen_2, title=f'{country}', hover_data='year', height=400)
     fig.update_layout(transition_duration=500)
     return fig
 
@@ -184,10 +178,10 @@ def update_graph_2(hover_all, col_chosen_1, col_chosen_2):
     Input('intermediate-value', 'data'),
     Input('dropdown', 'value'),
     )
-def update_graph_4(jsonified_cleaned_data, selectedData, value):
+def update_graph_4(jsonified_cleaned_data, value):
     datasets = json.loads(jsonified_cleaned_data)
     dff = pd.read_json(datasets[value], orient='split')
-    figure = px.histogram(dff, x='lifeExp', title=f'{value} life expectancy')
+    figure = px.histogram(dff, x='lifeExp', title=f'Average {value} life expectancy')
     return figure
 
 
